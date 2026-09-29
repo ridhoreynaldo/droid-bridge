@@ -1,0 +1,2 @@
+# droid-bridge tidak punya dependensi — murni Python stdlib.
+# File ini sengaja dikosongkan sebagai penanda.

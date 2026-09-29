@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Droid Bridge — remote kontrol Android via web</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:#0e1116;color:#e8ecf1;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;background:#161b22;border:1px solid #2a3139;border-radius:12px;margin-bottom:16px}
+header.top h1{font-size:18px;margin:0}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.dot.ok{background:#3fb950}.dot.bad{background:#f85149}.dot.warn{background:#d29922}
+.status{font-size:13px;color:#9aa4b2}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px}
+@media(max-width:900px){.main{grid-template-columns:1fr}}
+.screen-card{background:#161b22;border:1px solid #2a3139;border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:420px}
+.screen-card img{max-height:72vh;max-width:100%;border-radius:8px;background:#000;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-drag:none}
+.hint{font-size:12px;color:#9aa4b2;text-align:center}
+.panel{display:flex;flex-direction:column;gap:12px}
+.card{background:#161b22;border:1px solid #2a3139;border-radius:12px;padding:12px}
+.card h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#9aa4b2}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=password],select{background:#0e1116;color:#e8ecf1;border:1px solid #2a3139;border-radius:8px;padding:8px 10px;font-size:13px;width:100%}
+input:focus,select:focus{outline:none;border-color:#6cb6ff}
+button{background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
+button:hover{background:#388bfd}button.ghost{background:#21262d;border:1px solid #2a3139}
+button.ghost:hover{background:#2a3139}button:disabled{opacity:.5;cursor:default}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.mt8{margin-top:8px}.small{font-size:12px;color:#9aa4b2}.err{color:#f85149;font-size:12px}
+code.ic{background:#21262d;padding:2px 6px;border-radius:6px;font-size:12px}
+footer.foot{margin-top:16px;font-size:12px;color:#6e7681;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>📱 Droid Bridge</h1>
+    <span id="dot" class="dot warn"></span>
+    <span id="status" class="status">mengecek adb…</span>
+    <span id="devinfo" class="status"></span>
+    <span style="flex:1"></span>
+    <input id="token" type="password" placeholder="BRIDGE_TOKEN (kalau di-set)" style="max-width:220px">
+  </header>
+
+  <div id="errbox" class="card" style="display:none;margin-bottom:16px;border-color:#f85149">
+    <span class="err">⚠ <span id="errmsg"></span></span>
+  </div>
+
+  <div class="main">
+    <div class="screen-card">
+      <div id="placeholder" class="hint" style="padding:60px">menunggu frame…</div>
+      <img id="screen" alt="layar HP" draggable="false" style="display:none">
+      <div class="hint">klik = tap · drag = swipe · klik kanan = back</div>
+      <div class="row">
+        <button class="ghost" id="btnStream">⏸ pause</button>
+        <select id="fps" style="width:110px">
+          <option value="0.5">0.5 fps</option>
+          <option value="1" selected>1 fps</option>
+          <option value="2">2 fps</option>
+        </select>
+        <button class="ghost" id="btnRefresh">🔄 refresh device</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3>Device</h3>
+        <select id="serial"><option value="">— otomatis —</option></select>
+        <div class="row mt8"><input id="host" type="text" placeholder="192.168.1.20:5555"></div>
+        <div class="row mt8">
+          <button id="btnConnect">📶 connect wireless</button>
+          <button class="ghost" id="btnUnlock">🔓 unlock</button>
+        </div>
+        <div class="small mt8">Wireless: di HP nyalakan <code class="ic">Wireless debugging</code> (Opsi Pengembang), lalu pair &amp; connect pakai IP:port yang tampil di HP.</div>
+      </div>
+
+      <div class="card">
+        <h3>Tombol</h3>
+        <div class="btn-grid">
+          <button class="ghost" data-key="4">⤺ Back</button>
+          <button class="ghost" data-key="3">⌂ Home</button>
+          <button class="ghost" data-key="187">▤ Recent</button>
+          <button class="ghost" data-key="26">⏻ Power</button>
+          <button class="ghost" data-key="24">🔊 +</button>
+          <button class="ghost" data-key="25">🔉 −</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Ketik teks</h3>
+        <div class="row"><input id="textin" type="text" placeholder="ketik di HP…"></div>
+        <div class="row mt8"><button id="btnText">⌨ kirim</button></div>
+      </div>
+
+      <div class="card">
+        <h3>Untuk agen (API)</h3>
+        <div class="small">
+          <code class="ic">GET /api/screenshot</code> → PNG<br>
+          <code class="ic">POST /api/tap</code> <code class="ic">{"x,y"}</code><br>
+          <code class="ic">POST /api/swipe</code> <code class="ic">{"x1,y1,x2,y2"}</code><br>
+          <code class="ic">POST /api/key</code> <code class="ic">{"code"}</code><br>
+          Lihat README untuk contoh curl lengkap.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">droid-bridge · jalan di PC kamu, ngomong ke HP via ADB · jangan expose tanpa BRIDGE_TOKEN</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const tokenEl = $('token'), img = $('screen'), ph = $('placeholder');
+let token = localStorage.getItem('droid-bridge-token') || '';
+let serial = '', size = null, streamOn = true, fps = 1, imgUrl = null, dragStart = null;
+tokenEl.value = token;
+tokenEl.addEventListener('input', () => { token = tokenEl.value; localStorage.setItem('droid-bridge-token', token); });
+
+const H = (json) => {
+  const h = {};
+  if (json) h['Content-Type'] = 'application/json';
+  if (token) h['Authorization'] = 'Bearer ' + token;
+  return h;
+};
+const showErr = m => { $('errmsg').textContent = m; $('errbox').style.display = m ? 'block' : 'none'; };
+
+async function api(path, body) {
+  const res = await fetch('/api' + path, {
+    method: body ? 'POST' : 'GET',
+    headers: H(!!body),
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await res.json().catch(() => ({ok:false, error:'respons bukan JSON'}));
+  if (!data.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+const withSerialQ = p => serial ? p + (p.includes('?') ? '&' : '?') + 'serial=' + encodeURIComponent(serial) : p;
+const withSerialB = b => Object.assign({}, b, serial ? {serial} : {});
+
+async function refreshDevices() {
+  showErr('');
+  try {
+    const h = await fetch('/api/health').then(r => r.json());
+    const dot = $('dot');
+    dot.className = 'dot ' + (h.adb ? 'ok' : 'bad');
+    if (!h.adb) { $('status').textContent = 'adb bermasalah'; showErr(h.error || 'adb tidak ditemukan'); return; }
+    const d = await api('/devices');
+    const sel = $('serial'), cur = sel.value;
+    sel.innerHTML = '<option value="">— otomatis —</option>';
+    d.devices.forEach(x => {
+      const o = document.createElement('option');
+      o.value = x.serial; o.textContent = x.serial + ' (' + x.status + ')';
+      sel.appendChild(o);
+    });
+    const first = d.devices.find(x => x.status === 'device');
+    sel.value = cur || (first ? first.serial : '');
+    serial = sel.value;
+    $('status').textContent = 'adb ok · ' + d.devices.length + ' device';
+    await refreshSize();
+  } catch(e) { showErr(e.message); }
+}
+
+async function refreshSize() {
+  if (!serial) { size = null; $('devinfo').textContent = ''; return; }
+  try {
+    const d = await api(withSerialQ('/screen-size'));
+    size = {width: d.width, height: d.height};
+    $('devinfo').textContent = (d.model || 'device') + ' · ' + d.width + '×' + d.height;
+  } catch(e) { size = null; }
+}
+
+// --- streaming ---
+async function tick() {
+  if (streamOn) {
+    try {
+      let url = '/api/screenshot?t=' + Date.now();
+      if (serial) url += '&serial=' + encodeURIComponent(serial);
+      if (token) url += '&token=' + encodeURIComponent(token);
+      const res = await fetch(url, {headers: token ? {Authorization: 'Bearer ' + token} : {}, cache: 'no-store'});
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const u = URL.createObjectURL(blob);
+      if (imgUrl) URL.revokeObjectURL(imgUrl);
+      imgUrl = u; img.src = u;
+      img.style.display = 'block'; ph.style.display = 'none';
+      showErr('');
+    } catch(e) { /* pertahankan frame terakhir */ }
+  }
+  setTimeout(tick, Math.round(1000 / fps));
+}
+
+// --- input di layar ---
+const toDevice = (cx, cy) => {
+  if (!size) return null;
+  const r = img.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.round((cx - r.left) / r.width * size.width)),
+    y: Math.max(0, Math.round((cy - r.top) / r.height * size.height))
+  };
+};
+img.addEventListener('mousedown', e => { dragStart = {x: e.clientX, y: e.clientY}; });
+img.addEventListener('mouseup', async e => {
+  if (!dragStart) return;
+  const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+  const dist = Math.hypot(dx, dy), s = dragStart;
+  dragStart = null;
+  try {
+    if (dist < 12) {
+      const p = toDevice(e.clientX, e.clientY);
+      if (p) await api('/tap', withSerialB(p));
+    } else {
+      const a = toDevice(s.x, s.y), b = toDevice(e.clientX, e.clientY);
+      if (a && b) await api('/swipe', withSerialB({x1:a.x, y1:a.y, x2:b.x, y2:b.y, durationMs: Math.min(800, Math.round(dist*2))}));
+    }
+  } catch(err) { showErr(err.message); }
+});
+img.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  api('/key', withSerialB({code:'4'})).catch(err => showErr(err.message));
+});
+
+// --- panel ---
+$('btnRefresh').onclick = refreshDevices;
+$('serial').onchange = e => { serial = e.target.value; refreshSize(); };
+$('btnStream').onclick = () => { streamOn = !streamOn; $('btnStream').textContent = streamOn ? '⏸ pause' : '▶ resume'; };
+$('fps').onchange = e => { fps = parseFloat(e.target.value); };
+$('btnConnect').onclick = async () => {
+  const host = $('host').value.trim();
+  if (!host) return;
+  try { const r = await api('/connect', {host}); $('host').value = ''; await refreshDevices(); alert(r.message || 'connected'); }
+  catch(e) { showErr(e.message); }
+};
+$('btnUnlock').onclick = () => api('/unlock', withSerialB({})).catch(e => showErr(e.message));
+document.querySelectorAll('[data-key]').forEach(b =>
+  b.onclick = () => api('/key', withSerialB({code: b.dataset.key})).catch(e => showErr(e.message)));
+const sendText = () => {
+  const t = $('textin').value;
+  if (!t) return;
+  api('/text', withSerialB({text: t})).then(() => $('textin').value = '').catch(e => showErr(e.message));
+};
+$('btnText').onclick = sendText;
+$('textin').addEventListener('keydown', e => { if (e.key === 'Enter') sendText(); });
+
+refreshDevices();
+tick();
+</script>
+</body>
+</html>

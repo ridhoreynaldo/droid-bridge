@@ -1,0 +1,13 @@
+# python
+__pycache__/
+*.pyc
+
+# env (jangan commit token!)
+.env
+
+# logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
