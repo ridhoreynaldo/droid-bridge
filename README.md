@@ -105,8 +105,67 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/
 ## Roadmap
 
 - **Phase 1** (ini): remote kontrol web + API ✅
-- **Phase 2**: otak strategi CoC — deteksi base via computer vision, template serangan, loop belajar (bandit/RL ringan)
+- **Phase 2a** (ini, sebagian): **cocbot** — auto-attack engine CoC ✅
+  (mode farming/push + learning loop; vision penuh & OCR loot menyusul)
+- **Phase 2b**: OCR angka loot (seleksi base farming yang cerdas), deteksi army siap,
+  spell timing, multi-akun
 - Nanti: multi-touch/pinch, rekam aksi, clipboard sync
+
+## ⚔️ CoC Bot — auto attack (Phase 2a)
+
+Bot jalan **real-time** sebagai thread di dalam `bridge.py`: loop kontinu
+screenshot → kenali kondisi → tap, secepat ADB memungkinkan (~2 tap/detik,
+screenshot tiap 0.5 detik saat tempur). Buka CoC di HP, pilih mode di panel
+**CoC Bot**, bot mengambil alih sampai kamu pencet Stop.
+
+| Mode | Tujuan | Strategi bawaan |
+|---|---|---|
+| 🌾 **Farming** | Loot sebanyak-banyaknya per jam | Goblin keliling tepi, Archer dari sudut, Barbarian garis depan |
+| 🏆 **Push Rank** | Bintang maksimal (trophy push) | Funnel kiri, Funnel kanan, Kepung semua sisi |
+
+**Learning selalu aktif ("belajar terus")**: tiap serangan dicatat
+(mode, strategi, bintang, durasi) ke `cocbot_log.jsonl`; bobot strategi
+disimpan di `cocbot_state.json`. Tiap serangan berikutnya dipilih dengan
+**epsilon-greedy** — strategi yang historinya bagus dipakai lebih sering,
+sesekali coba yang lain. Makin banyak serangan, makin pintar pilih strateginya.
+
+### Cara pakai
+
+1. (Opsional, untuk akurasi) `pip install -r requirements-bot.txt` → aktifkan
+   template matching opencv. Tanpa ini bot jalan dalam **mode koordinat**.
+2. Salin `cocbot_config.json.example` → `cocbot_config.json`, sesuaikan:
+   - `slots`: urutan troops di army kamu (kiri → kanan di troop bar)
+   - `ui`: koordinat tombol CoC kalau meleset di HP kamu
+   - `coc_icon`: posisi ikon CoC (atau kosongkan → dibuka via monkey)
+3. Buka CoC di HP (atau tombol 📱 buka CoC).
+4. Di web UI → panel **CoC Bot** → pilih 🌾 Farming / 🏆 Push Rank.
+5. Pantau log + tabel statistik langsung di UI. Stop kapan saja.
+
+### Bikin bot lebih pintar: template vision
+
+Tanpa opencv, bot buta — ia tap koordinat dari config. Dengan template,
+bot menemukan tombol & menghitung bintang hasil secara presisi:
+
+1. Buka layar yang diinginkan di HP (mis. layar hasil pertempuran).
+2. Di panel CoC Bot: isi nama template → **📸 jadikan template**.
+3. Template penting: `attack_button`, `find_match`, `next_button`,
+   `troop_bar`, `battle_result`, `return_home`, `star`.
+
+Detail: `templates/README.md`.
+
+### API bot
+
+```bash
+curl -X POST localhost:3000/api/bot/start -H 'Content-Type: application/json' \
+  -d '{"mode":"farming"}'     # atau "push"
+curl -X POST localhost:3000/api/bot/stop
+curl localhost:3000/api/bot/status
+curl localhost:3000/api/bot/stats     # bobot strategi hasil belajar
+curl "localhost:3000/api/bot/log?limit=40"
+```
+
+> ⚠️ **Fair Play**: automasi CoC melanggar ToS Supercell — risiko **ban permanen**.
+> Pakai akun eksperimen/tumbal, jangan akun utama.
 
 ## Lisensi
 

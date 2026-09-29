@@ -8,6 +8,11 @@ __pycache__/
 # logs
 *.log
 
+# cocbot runtime (jangan commit!)
+cocbot_config.json
+cocbot_state.json
+cocbot_log.jsonl
+
 # OS
 .DS_Store
 Thumbs.db

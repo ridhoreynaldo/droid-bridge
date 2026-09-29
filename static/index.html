@@ -13,7 +13,7 @@ header.top h1{font-size:18px;margin:0}
 .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .dot.ok{background:#3fb950}.dot.bad{background:#f85149}.dot.warn{background:#d29922}
 .status{font-size:13px;color:#9aa4b2}
-.main{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px}
 @media(max-width:900px){.main{grid-template-columns:1fr}}
 .screen-card{background:#161b22;border:1px solid #2a3139;border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:420px}
 .screen-card img{max-height:72vh;max-width:100%;border-radius:8px;background:#000;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-drag:none}
@@ -27,10 +27,20 @@ input:focus,select:focus{outline:none;border-color:#6cb6ff}
 button{background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
 button:hover{background:#388bfd}button.ghost{background:#21262d;border:1px solid #2a3139}
 button.ghost:hover{background:#2a3139}button:disabled{opacity:.5;cursor:default}
+button.mode{font-size:15px;padding:10px 14px}
+button.mode.active{outline:2px solid #3fb950}
+button.danger{background:#a40e26}button.danger:hover{background:#c21f36}
 .btn-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .mt8{margin-top:8px}.small{font-size:12px;color:#9aa4b2}.err{color:#f85149;font-size:12px}
 code.ic{background:#21262d;padding:2px 6px;border-radius:6px;font-size:12px}
 footer.foot{margin-top:16px;font-size:12px;color:#6e7681;text-align:center}
+pre.log{background:#0e1116;border:1px solid #2a3139;border-radius:8px;padding:8px;font-size:11px;max-height:220px;overflow-y:auto;white-space:pre-wrap;margin:8px 0 0}
+table.stats{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+table.stats th,table.stats td{text-align:left;padding:4px 6px;border-bottom:1px solid #2a3139}
+table.stats th{color:#9aa4b2;font-weight:600}
+.botstate{font-size:13px;margin-top:8px}
+.botstate b{color:#6cb6ff}
+.pill{display:inline-block;background:#21262d;border:1px solid #2a3139;border-radius:20px;padding:2px 10px;font-size:12px;margin:2px}
 </style>
 </head>
 <body>
@@ -65,6 +75,34 @@ footer.foot{margin-top:16px;font-size:12px;color:#6e7681;text-align:center}
     </div>
 
     <div class="panel">
+      <div class="card" style="border-color:#1f6feb">
+        <h3>⚔️ CoC Bot — auto attack</h3>
+        <div class="row">
+          <button class="mode" id="btnFarm">🌾 Farming</button>
+          <button class="mode" id="btnPush">🏆 Push Rank</button>
+          <button class="danger" id="btnStopBot">⏹️ Stop</button>
+        </div>
+        <div class="row mt8">
+          <button class="ghost" id="btnOpenCoc">📱 buka CoC</button>
+          <button class="ghost" id="btnBotRefresh">🔄 refresh</button>
+        </div>
+        <div class="botstate" id="botstate">bot idle</div>
+        <div class="small mt8">Learning <b>selalu aktif</b>: tiap serangan dicatat &amp; strategi terbaik dipakai lebih sering. <span id="cv2info"></span></div>
+        <table class="stats" id="statstable" style="display:none">
+          <thead><tr><th>Strategi</th><th>Serangan</th><th>Rata² ★</th></tr></thead>
+          <tbody id="statbody"></tbody>
+        </table>
+        <pre class="log" id="botlog">log bot…</pre>
+      </div>
+
+      <div class="card">
+        <h3>📸 Template vision</h3>
+        <div class="row"><input id="tplname" type="text" placeholder="nama template, mis. star"></div>
+        <div class="row mt8"><button id="btnCapture">📸 jadikan template</button></div>
+        <div class="small mt8">Template tersimpan: <span id="tpllist">-</span></div>
+        <div class="small mt8">Butuh: attack_button, find_match, next_button, troop_bar, battle_result, return_home, star. Lihat <code class="ic">templates/README.md</code>.</div>
+      </div>
+
       <div class="card">
         <h3>Device</h3>
         <select id="serial"><option value="">— otomatis —</option></select>
@@ -100,7 +138,7 @@ footer.foot{margin-top:16px;font-size:12px;color:#6e7681;text-align:center}
           <code class="ic">GET /api/screenshot</code> → PNG<br>
           <code class="ic">POST /api/tap</code> <code class="ic">{"x,y"}</code><br>
           <code class="ic">POST /api/swipe</code> <code class="ic">{"x1,y1,x2,y2"}</code><br>
-          <code class="ic">POST /api/key</code> <code class="ic">{"code"}</code><br>
+          <code class="ic">POST /api/bot/start</code> <code class="ic">{"mode"}</code><br>
           Lihat README untuk contoh curl lengkap.
         </div>
       </div>
@@ -171,7 +209,6 @@ async function refreshSize() {
   } catch(e) { size = null; }
 }
 
-// --- streaming ---
 async function tick() {
   if (streamOn) {
     try {
@@ -186,12 +223,11 @@ async function tick() {
       imgUrl = u; img.src = u;
       img.style.display = 'block'; ph.style.display = 'none';
       showErr('');
-    } catch(e) { /* pertahankan frame terakhir */ }
+    } catch(e) {}
   }
   setTimeout(tick, Math.round(1000 / fps));
 }
 
-// --- input di layar ---
 const toDevice = (cx, cy) => {
   if (!size) return null;
   const r = img.getBoundingClientRect();
@@ -221,7 +257,6 @@ img.addEventListener('contextmenu', e => {
   api('/key', withSerialB({code:'4'})).catch(err => showErr(err.message));
 });
 
-// --- panel ---
 $('btnRefresh').onclick = refreshDevices;
 $('serial').onchange = e => { serial = e.target.value; refreshSize(); };
 $('btnStream').onclick = () => { streamOn = !streamOn; $('btnStream').textContent = streamOn ? '⏸ pause' : '▶ resume'; };
@@ -243,7 +278,52 @@ const sendText = () => {
 $('btnText').onclick = sendText;
 $('textin').addEventListener('keydown', e => { if (e.key === 'Enter') sendText(); });
 
+// ---------- CoC Bot ----------
+async function refreshBot() {
+  try {
+    const s = await api('/bot/status');
+    const el = $('botstate');
+    if (s.running) {
+      el.innerHTML = `🟢 <b>${s.mode}</b> · ${s.state} · strategi: <b>${s.strategy}</b> · serangan: ${s.attacks_done} · ${Math.round(s.uptime_s)}s`;
+      $('btnFarm').classList.toggle('active', s.mode === 'farming');
+      $('btnPush').classList.toggle('active', s.mode === 'push');
+    } else {
+      el.textContent = 'bot idle — pilih mode untuk mulai';
+      $('btnFarm').classList.remove('active');
+      $('btnPush').classList.remove('active');
+    }
+    const st = await api('/bot/stats');
+    $('cv2info').textContent = st.has_cv2 ? '(vision: opencv aktif)' : '(vision: mode koordinat — pip install -r requirements-bot.txt untuk template matching)';
+    const tb = $('statbody');
+    if (st.stats.length) {
+      $('statstable').style.display = 'table';
+      tb.innerHTML = st.stats.map(r => `<tr><td>${r.mode}/${r.strategy}</td><td>${r.attacks}</td><td>${r.avg_reward.toFixed(1)}</td></tr>`).join('');
+    } else {
+      $('statstable').style.display = 'none';
+    }
+    const lg = await api('/bot/log?limit=40');
+    $('botlog').textContent = lg.lines.join('\n') || 'log bot…';
+    $('botlog').scrollTop = $('botlog').scrollHeight;
+    const tp = await api('/bot/templates');
+    $('tpllist').textContent = tp.templates.join(', ') || '-';
+  } catch(e) { /* bot belum aktif / bridge lama */ }
+}
+$('btnFarm').onclick = async () => { try { await api('/bot/start', {mode:'farming'}); } catch(e){ showErr(e.message); } refreshBot(); };
+$('btnPush').onclick = async () => { try { await api('/bot/start', {mode:'push'}); } catch(e){ showErr(e.message); } refreshBot(); };
+$('btnStopBot').onclick = async () => { try { await api('/bot/stop'); } catch(e){} refreshBot(); };
+$('btnOpenCoc').onclick = () => api('/bot/open-coc', withSerialB({})).catch(e => showErr(e.message));
+$('btnBotRefresh').onclick = refreshBot;
+$('btnCapture').onclick = async () => {
+  const name = $('tplname').value.trim();
+  if (!name) { showErr('isi nama template dulu'); return; }
+  try { const r = await api('/bot/capture', withSerialB({name})); $('tplname').value = ''; showErr(''); alert('template tersimpan: ' + r.template); }
+  catch(e) { showErr(e.message); }
+  refreshBot();
+};
+setInterval(refreshBot, 2500);
+
 refreshDevices();
+refreshBot();
 tick();
 </script>
 </body>

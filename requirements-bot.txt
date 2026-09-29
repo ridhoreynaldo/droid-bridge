@@ -1,0 +1,5 @@
+# Dependensi opsional KHUSUS cocbot (template matching / computer vision).
+# Inti droid-bridge (bridge.py) tetap jalan tanpa ini — bot pakai mode koordinat.
+# Install:  pip install -r requirements-bot.txt
+opencv-python-headless>=4.8
+numpy>=1.24
